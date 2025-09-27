@@ -22,8 +22,6 @@ Parameters:
   BucketName:
     Description: Latitude
     Type: String
-    
-
 Resources:
   Schedule:
     Type: AWS::Scheduler::Schedule
@@ -38,7 +36,6 @@ Resources:
         Arn: !GetAtt Function.Arn
         RoleArn: !GetAtt Role.Arn
       State: ENABLED
-      EndDate: '2025-10-10T23:59:00Z'
   Role:
     Type: AWS::IAM::Role
     Properties:
@@ -169,10 +166,10 @@ Resources:
         - arn:aws:lambda:us-east-1:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-x86_64:19
       Environment:
         Variables:
-          - LAT: !Ref Latitude
-          - LOG: !Ref Longitude
-          - API_KEY: !Ref ApiKey
-          - BUCKET_NAME: !Ref BucketName
+          LAT: !Ref Latitude
+          LOG: !Ref Longitude
+          API_KEY: !Ref ApiKey
+          BUCKET_NAME: !Ref BucketName
       Tags:
         - Key: project
           Value: !Ref ProjectName
