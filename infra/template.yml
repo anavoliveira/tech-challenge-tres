@@ -7,9 +7,6 @@ Parameters:
     Description: Nome do projeto
     Type: String
     Default: OpenWeather
-  ImageURI:
-    Description: Nome do projeto
-    Type: String
   Latitude:
     Description: Latitude
     Type: String
@@ -81,11 +78,11 @@ Resources:
 
           LAT = os.getenv("LATITUDE")
           LON = os.getenv("LONGITUDE")
-          API_KEY = os.getenv("API_KEY"")
+          API_KEY = os.getenv("API_KEY")
 
           def create_df(data):
             date = datetime.fromtimestamp(data["dt"])
-            print(f"Data e hora da medição: {date}")
+            print(f"Data e hora da medi??o: {date}")
 
             data_df = {
               "weather_id": data["weather"][0]["id"],
@@ -117,7 +114,7 @@ Resources:
             month = df["month"].iloc[0]
             day = df["day"].iloc[0]
             hour = df["hour"].iloc[0]
-            print(f"Data e hora da medição: {year}-{month}-{day} {hour}:00:00")
+            print(f"Data e hora da medi??o: {year}-{month}-{day} {hour}:00:00")
             bucket_name = os.getenv("BUCKET_NAME")
             file_path = "/tmp/weather_data.parquet"
             object_name = f"weather_data/raw/{year}{month}{day}{hour}.parquet"
@@ -135,22 +132,22 @@ Resources:
               api_url = f"https://api.openweathermap.org/data/2.5/weather?lat={LAT}&lon={LON}"
               params = {
                   "appid": API_KEY,
-                  "units": "metric",  # temperatura em °C
-                  "lang": "pt"        # descrição em português
+                  "units": "metric",  # temperatura em graus C
+                  "lang": "pt"        # descricao em portugues
               }
 
               try:
                   response = requests.get(api_url, params=params)
                   data = response.json()
 
-                  print("Requisição bem-sucedida. Dados recebidos:")
+                  print("Requisicao bem-sucedida. Dados recebidos:")
                   df = create_df(data)
                   create_s3_object(df)
               except Exception as exception:
-                  print("Erro ao fazer a requisição:", exception)
+                  print("Erro ao fazer a requisicao:", exception)
                   return {
                   "statusCode": 500,
-                  "body": json.dumps({"error": "Erro ao fazer a requisição"})
+                  "body": json.dumps({"error": "Erro ao fazer a requisicao"})
                   }
 
               return {
@@ -166,8 +163,8 @@ Resources:
         - arn:aws:lambda:us-east-1:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-x86_64:19
       Environment:
         Variables:
-          LAT: !Ref Latitude
-          LOG: !Ref Longitude
+          LATITUDE: !Ref Latitude
+          LONGITUDE: !Ref Longitude
           API_KEY: !Ref ApiKey
           BUCKET_NAME: !Ref BucketName
       Tags:
