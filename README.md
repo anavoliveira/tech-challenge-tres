@@ -1,4 +1,4 @@
-# WeatherSense — previsão e detecção de anomalias meteorológicas em tempo real
+# WeatherSense — previsão de tempo ao longo do dia
 
 
 A  API do **OpenWeather** disponibiliza dados públicos, atualizações em tempo real, histórico sobre o clima, permitindo a criação de aplicações para prever chuva, temperatura, detectar anomalias, alimentar dashboards, acionar notificações etc.
