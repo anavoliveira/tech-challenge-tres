@@ -82,7 +82,7 @@ Resources:
 
           def create_df(data):
             date = datetime.fromtimestamp(data["dt"])
-            print(f"Data e hora da medi??o: {date}")
+            print(f"Data e hora da medicao: {date}")
 
             data_df = {
               "weather_id": data["weather"][0]["id"],
@@ -114,7 +114,7 @@ Resources:
             month = df["month"].iloc[0]
             day = df["day"].iloc[0]
             hour = df["hour"].iloc[0]
-            print(f"Data e hora da medi??o: {year}-{month}-{day} {hour}:00:00")
+            print(f"Data e hora da medicao: {year}-{month}-{day} {hour}:00:00")
             bucket_name = os.getenv("BUCKET_NAME")
             file_path = "/tmp/weather_data.parquet"
             object_name = f"weather_data/raw/{year}{month}{day}{hour}.parquet"
@@ -170,3 +170,158 @@ Resources:
       Tags:
         - Key: project
           Value: !Ref ProjectName
+  ScheduleInference:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: trigger-lambda-inference
+      Description: Scheduler responsavel por acionar a lambda que realiza a inferencia
+        OpenWeather
+      ScheduleExpression: cron(0, 6, *, *, ?, *)
+      FlexibleTimeWindow:
+        Mode: 'OFF'
+      Target:
+        Arn: !GetAtt FunctionInference.Arn
+        RoleArn: !GetAtt Role.Arn
+      State: ENABLED
+  FunctionInference:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: lambda-inference-api-openweather
+      Description: Lambda responsavel por realiza a inferencia no endpoint criado para
+        hospedar o modelo
+      Architectures:
+        - x86_64
+      Code:
+        ZipFile: |
+                
+          import requests
+          import pandas as pd
+          import boto3
+          import json
+          import os
+          from datetime import datetime
+
+          # Variaveis de ambiente
+          LAT = os.getenv("LATITUDE")
+          LON = os.getenv("LONGITUDE")
+          API_KEY = os.getenv("API_KEY")
+          ENDPOINT_NAME = os.getenv("ENDPOINT_NAME")
+          SNS_TOPIC_ARN = os.getenv("SNS_TOPIC_ARN")
+
+          # Clientes AWS
+          runtime = boto3.client("sagemaker-runtime")
+          sns = boto3.client("sns")
+
+          def create_df(data):
+              """Cria DataFrame com as features necessarias"""
+              date = datetime.fromtimestamp(data["dt"])
+
+              data_df = {
+                  "year": date.year,
+                  "month": date.month,
+                  "day": date.day,
+                  "hour": date.hour,
+                  "temp": data["main"]["temp"],
+                  "humidity": data["main"]["humidity"],
+                  "pressure": data["main"]["pressure"],
+                  "clouds_all": data["clouds"]["all"],
+                  "wind_speed": data["wind"]["speed"],
+                  "wind_deg": data["wind"]["deg"],
+                  "temp_min": data["main"]["temp_min"],
+                  "temp_max": data["main"]["temp_max"],
+                  "temp_feels_like": data["main"]["feels_like"],
+              }
+
+              df = pd.DataFrame([data_df])
+              print("Dados para inferência:")
+              print(df)
+              return df
+
+
+          def invoke_sagemaker_endpoint(df):
+              """Envia os dados para o endpoint e retorna a inferencia"""
+
+              payload = df.to_json(orient="records")
+
+              response = runtime.invoke_endpoint(
+                  EndpointName=ENDPOINT_NAME,
+                  ContentType="application/json",
+                  Body=payload
+              )
+
+              result = json.loads(response["Body"].read().decode())
+              print(f"Resultado da inferência: {result}")
+              return result
+
+
+          def send_sns_notification(message):
+              """Envia mensagem com o resultado da inferencia via SNS"""
+              response = sns.publish(
+                  TopicArn=SNS_TOPIC_ARN,
+                  Subject="Resultado da inferência OpenWeather",
+                  Message=message
+              )
+              print("Notificacao enviada via SNS:", response)
+              return response
+
+
+          def lambda_handler(event, context):
+              """Funcao principal"""
+              api_url = f"https://api.openweathermap.org/data/2.5/weather?lat={LAT}&lon={LON}"
+              params = {
+                  "appid": API_KEY,
+                  "units": "metric",
+                  "lang": "pt"
+              }
+
+              try:
+                  response = requests.get(api_url, params=params)
+                  data = response.json()
+                  print("Dados recebidos da API")
+
+                  df = create_df(data)
+
+                  # Realiza a inferência no endpoint
+                  prediction = invoke_sagemaker_endpoint(df)
+
+                  # Envia notificacao por e-mail
+                  message = (
+                      f"Previsao baseada nos dados atuais ({datetime.now()}):\n\n"
+                      f"Input: {df.to_dict(orient='records')[0]}\n\n"
+                      f"Resultado da inferência: {prediction}"
+                  )
+                  send_sns_notification(message)
+
+                  return {
+                      "statusCode": 200,
+                      "body": json.dumps({"message": "Inferência e notificacao concluidas com sucesso"})
+                  }
+
+              except Exception as e:
+                  print("❌ Erro:", e)
+                  return {
+                      "statusCode": 500,
+                      "body": json.dumps({"error": str(e)})
+                  }
+
+      Role: !GetAtt Role.Arn
+      Timeout: 600
+      Runtime: !Ref LambdaRuntime
+      Handler: index.lambda_handler
+      Layers:
+        - arn:aws:lambda:us-east-1:336392948345:layer:AWSSDKPandas-Python313:4
+        - arn:aws:lambda:us-east-1:017000801446:layer:AWSLambdaPowertoolsPythonV3-python313-x86_64:19
+      Environment:
+        Variables:
+          LATITUDE: !Ref Latitude
+          LONGITUDE: !Ref Longitude
+          API_KEY: !Ref ApiKey
+          BUCKET_NAME: !Ref BucketName
+      Tags:
+        - Key: project
+          Value: !Ref ProjectName
+  SNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub ${ProjectName}-inference-results
+      DisplayName: Resultados da previsao do tempo
