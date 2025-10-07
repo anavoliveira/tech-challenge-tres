@@ -5,10 +5,19 @@ A  API do **OpenWeather** disponibiliza dados públicos, atualizações em tempo
 
 
 **Objetivo:**
- - Coletar dados do OpenWeather em tempo real
- - Armazenar em Data Lake/DW
- - Treinar modelos que prevejam probabilidade de chuva/precipitação nas próximas 3 horas e que detectem anomalias (mudanças repentinas) no padrão local. 
-    - O modelo alimentatá um dashboard e uma API de predições (endpoint /predict) para consumo por aplicações.
+ - Coletar dados do OpenWeather em tempo real.
+ - Armazenar em um bucket S3.
+ - Treinar um modelo que crie previsões da temperatura para diferentes horários durante o dia (11h, 16h e 21h).
+ - Criar uma aplicação que realize a predição e envie as informações via email para os usuários todos os dias às 6h.
+
+## Arquitetura
+
+* **Ingestão:** Lambda + EventBridge que chama OpenWeather API a cada 60 min. 
+* **Armazenamento:** S3 (raw / history / consolidate ).
+* **Treino:** SageMaker Studio.
+* **Serving (produção):** SageMaker endpoint (real-time).
+* **Dashboard:** Streamlit hospedado em ECS.
+* **Observability:** CloudWatch + logs + métricas de validade do dado.
 
 
 ## Dados Disponiveis
@@ -49,12 +58,4 @@ A subscrinção grátis da API disponibiliza os seguintes dados:
 https://openweathermap.org/api/one-call-3#current
 
 
-## Arquitetura
-
-* **Ingestão:** Lambda + EventBridge que chama OpenWeather API a cada 60 min. 
-* **Armazenamento:** S3 (raw / history / consolidate ).
-* **Treino:** SageMaker Studio.
-* **Serving (produção):** SageMaker endpoint (real-time).
-* **Dashboard:** Streamlit hospedado em ECS.
-* **Observability:** CloudWatch + logs + métricas de validade do dado.
 
